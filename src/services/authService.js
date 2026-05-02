@@ -5,8 +5,21 @@ const { User } = require('../models/User');
 const { env } = require('../config/env');
 const { AppError } = require('../utils/AppError');
 
-function signToken(user) {
-  return jwt.sign({ sub: String(user._id) }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+function buildJwtPayload(user) {
+  const payload = { sub: String(user._id) };
+  if (Array.isArray(user.roles) && user.roles.length > 0) payload.roles = user.roles;
+  return payload;
+}
+
+function createAccessToken(user) {
+  const accessToken = jwt.sign(buildJwtPayload(user), env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+  const decoded = jwt.decode(accessToken);
+  const expiresAt =
+    decoded && typeof decoded === 'object' && typeof decoded.exp === 'number'
+      ? new Date(decoded.exp * 1000).toISOString()
+      : undefined;
+
+  return { accessToken, expiresAt };
 }
 
 async function register({ name, email, password }) {
@@ -16,26 +29,32 @@ async function register({ name, email, password }) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await User.create({ name, email, passwordHash });
+  const user = await User.create({ name, email, passwordHash, active: true, roles: [] });
 
-  const token = signToken(user);
+  const { accessToken, expiresAt } = createAccessToken(user);
   return {
     user: { id: String(user._id), name: user.name, email: user.email },
-    token,
+    accessToken,
+    expiresAt,
+    token: accessToken,
   };
 }
 
 async function login({ email, password }) {
   const user = await User.findOne({ email });
-  if (!user) throw new AppError('Invalid credentials', { statusCode: 401, code: 'INVALID_CREDENTIALS' });
+  if (!user || user.active === false) {
+    throw new AppError('Invalid credentials', { statusCode: 401, code: 'INVALID_CREDENTIALS' });
+  }
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new AppError('Invalid credentials', { statusCode: 401, code: 'INVALID_CREDENTIALS' });
 
-  const token = signToken(user);
+  const { accessToken, expiresAt } = createAccessToken(user);
   return {
     user: { id: String(user._id), name: user.name, email: user.email },
-    token,
+    accessToken,
+    expiresAt,
+    token: accessToken,
   };
 }
 

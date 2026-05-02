@@ -44,6 +44,14 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, expiresAt]
+                properties:
+                  accessToken: { type: string }
+                  expiresAt: { type: string, format: date-time }
   /api/users/me:
     get:
       summary: Current user (requires JWT)

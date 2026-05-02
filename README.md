@@ -37,12 +37,22 @@ npm start
 npm run dev
 ```
 
+## Testes
+
+```bash
+npm test
+```
+
 ## Endpoints
 
 - `GET /api/health`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/users/me` (Bearer token)
+
+### Login
+
+- **200**: retorna `accessToken` e `expiresAt` (ISO 8601)
 
 ## Swagger
 

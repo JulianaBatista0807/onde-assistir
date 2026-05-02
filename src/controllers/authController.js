@@ -1,20 +1,36 @@
 const { AppError } = require('../utils/AppError');
 const authService = require('../services/authService');
 
-function assertString(value, field) {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new AppError(`Invalid field: ${field}`, { statusCode: 400, code: 'VALIDATION_ERROR' });
+function validateRequiredStrings(body, fields) {
+  const invalidFields = [];
+  const values = {};
+
+  for (const field of fields) {
+    const value = body?.[field];
+    if (typeof value !== 'string' || value.trim() === '') {
+      invalidFields.push({ field, message: 'Required' });
+      continue;
+    }
+    values[field] = value.trim();
   }
-  return value.trim();
+
+  if (invalidFields.length > 0) {
+    throw new AppError('Validation error', {
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      details: { fields: invalidFields },
+    });
+  }
+
+  return values;
 }
 
 async function register(req, res, next) {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
-    const email = assertString(req.body?.email, 'email').toLowerCase();
-    const password = assertString(req.body?.password, 'password');
+    const { email, password } = validateRequiredStrings(req.body, ['email', 'password']);
 
-    const result = await authService.register({ name, email, password });
+    const result = await authService.register({ name, email: email.toLowerCase(), password });
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -23,10 +39,9 @@ async function register(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const email = assertString(req.body?.email, 'email').toLowerCase();
-    const password = assertString(req.body?.password, 'password');
+    const { email, password } = validateRequiredStrings(req.body, ['email', 'password']);
 
-    const result = await authService.login({ email, password });
+    const result = await authService.login({ email: email.toLowerCase(), password });
     res.status(200).json(result);
   } catch (err) {
     next(err);
