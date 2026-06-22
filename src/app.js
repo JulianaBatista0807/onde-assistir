@@ -1,3 +1,5 @@
+const path = require('node:path');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -25,6 +27,8 @@ function createApp() {
 
   registerSwagger(app);
   registerRoutes(app);
+
+  app.use(express.static(path.join(__dirname, '..', '..', 'frontend')));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

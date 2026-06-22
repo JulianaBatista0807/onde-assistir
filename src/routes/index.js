@@ -2,6 +2,7 @@ const express = require('express');
 
 const { authRoutes } = require('./authRoutes');
 const { userRoutes } = require('./userRoutes');
+const { titleRoutes } = require('./titleRoutes');
 
 function registerRoutes(app) {
   const router = express.Router();
@@ -10,6 +11,7 @@ function registerRoutes(app) {
 
   router.use('/auth', authRoutes);
   router.use('/users', userRoutes);
+  router.use('/titles', titleRoutes);
 
   app.use('/api', router);
 }
