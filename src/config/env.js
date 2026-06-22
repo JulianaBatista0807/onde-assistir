@@ -18,6 +18,10 @@ const env = {
   MONGODB_URI: required('MONGODB_URI'),
   JWT_SECRET: required('JWT_SECRET'),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+
+  TMDB_API_KEY: process.env.TMDB_API_KEY,
+  TMDB_REGION: process.env.TMDB_REGION || 'BR',
+  TMDB_LANGUAGE: process.env.TMDB_LANGUAGE || 'pt-BR',
 };
 
 module.exports = { env };

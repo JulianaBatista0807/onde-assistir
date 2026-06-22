@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feat/**'
+  workflow_dispatch:
+  schedule:
+    # Segunda-feira às 06:00 UTC (03:00 horário de Brasília)
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Testes automatizados
+    runs-on: ubuntu-latest
+
+    env:
+      CI: true
+      NODE_ENV: test
+      MONGODB_URI: mongodb://localhost:27017/test
+      JWT_SECRET: ci-test-secret
+      TMDB_API_KEY: ci-dummy-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar testes
+        run: npm run test:ci
+
+      - name: Publicar relatório de testes (GitHub Checks)
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: reports/junit.xml
+          check_name: Resultado dos testes Jest
+          comment_mode: off
+
+      - name: Armazenar relatório JUnit
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ github.run_number }}
+          path: reports/junit.xml
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Armazenar relatório de cobertura
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: coverage-report-${{ github.run_number }}
+          path: coverage/
+          retention-days: 30
