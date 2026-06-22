@@ -1,74 +1,183 @@
-# Onde Assistir API
+# Onde Assistir
 
-API REST em Node.js (JavaScript) com Express, autenticação JWT e MongoDB.
+Aplicação para descobrir **onde assistir** filmes e séries no Brasil. Combina uma API REST (Node.js + Express + MongoDB), autenticação JWT, busca integrada ao [TMDB](https://www.themoviedb.org/) e um front-end estático em HTML/CSS/JS.
 
-## Requisitos
+**Repositório:** https://github.com/JulianaBatista0807/onde-assistir
 
-- Node.js 18+ (recomendado 20+)
-- MongoDB (local ou remoto)
+---
 
-## Setup
+## Sumário
 
-1. Instale dependências
+- [Funcionalidades](#funcionalidades)
+- [Stack tecnológica](#stack-tecnológica)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Pré-requisitos](#pré-requisitos)
+- [Configuração](#configuração)
+- [Como rodar](#como-rodar)
+- [Front-end](#front-end)
+- [API](#api)
+- [Testes](#testes)
+- [Integração Contínua (CI)](#integração-contínua-ci)
+- [Swagger](#swagger)
+- [Solução de problemas](#solução-de-problemas)
+
+---
+
+## Funcionalidades
+
+- Cadastro e login de usuários com JWT
+- Perfil do usuário autenticado
+- Busca de filmes e séries via TMDB (título, sinopse, poster)
+- Exibição de plataformas de streaming no Brasil (assinatura, alugar, comprar)
+- Documentação interativa com Swagger
+- Pipeline de CI com GitHub Actions (push, manual e agendada)
+
+---
+
+## Stack tecnológica
+
+| Camada | Tecnologias |
+|--------|-------------|
+| Backend | Node.js, Express 5, Mongoose |
+| Autenticação | JWT, bcryptjs |
+| Banco de dados | MongoDB (Atlas ou local) |
+| Busca de títulos | API TMDB + dados JustWatch (região BR) |
+| Front-end | HTML, CSS e JavaScript (vanilla) |
+| Testes | Jest, jest-junit |
+| CI/CD | GitHub Actions |
+
+---
+
+## Estrutura do projeto
+
+```
+onde-assistir/              ← repositório Git (este diretório)
+├── .github/workflows/      ← pipeline CI
+├── src/
+│   ├── config/             ← env, conexão MongoDB
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/             ← User, Title
+│   ├── routes/
+│   ├── services/           ← auth, TMDB, busca
+│   └── utils/
+├── scripts/seedTitles.js   ← seed opcional (legado)
+├── server.js
+└── swagger.yaml
+
+frontend/                   ← front-end (pasta irmã, um nível acima)
+├── login.html
+├── register.html
+├── home.html
+├── css/
+└── js/
+```
+
+O Express serve os arquivos de `frontend/` automaticamente quando a pasta existe no caminho `../frontend` em relação a este repositório.
+
+---
+
+## Pré-requisitos
+
+- **Node.js** 18+ (recomendado 20+)
+- **MongoDB** local ou [MongoDB Atlas](https://www.mongodb.com/atlas)
+- **Chave TMDB** gratuita para a busca de títulos ([obter aqui](https://www.themoviedb.org/settings/api))
+
+---
+
+## Configuração
+
+### 1. Instalar dependências
 
 ```bash
 npm install
 ```
 
-2. Crie o arquivo `.env` (baseado no exemplo)
+### 2. Criar o arquivo `.env`
 
 ```bash
+# Windows
 copy .env.example .env
+
+# Linux/macOS
+cp .env.example .env
 ```
 
-3. Ajuste as variáveis no `.env` (principalmente `MONGODB_URI`, `JWT_SECRET` e `TMDB_API_KEY`)
+### 3. Variáveis de ambiente
 
-### TMDB (busca de filmes e séries)
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `MONGODB_URI` | Sim | Connection string do MongoDB |
+| `JWT_SECRET` | Sim | Segredo para assinar tokens JWT |
+| `TMDB_API_KEY` | Sim* | Chave da API TMDB (*obrigatória para busca) |
+| `PORT` | Não | Porta do servidor (padrão: `3000`) |
+| `JWT_EXPIRES_IN` | Não | Validade do token (padrão: `7d`) |
+| `TMDB_REGION` | Não | Região de streaming (padrão: `BR`) |
+| `TMDB_LANGUAGE` | Não | Idioma dos metadados (padrão: `pt-BR`) |
+| `CORS_ORIGIN` | Não | Origens permitidas (padrão: `*`) |
 
-A busca usa a [API do TMDB](https://developer.themoviedb.org/docs) — a base mais usada do setor para metadados de filmes/séries. Os dados de **onde assistir** vêm da parceria TMDB + JustWatch (por região, padrão `BR`).
+**Exemplo `.env`:**
 
-O TMDB **não é um catálogo oficial universal**: cobre a maior parte do conteúdo mainstream, mas pode faltar títulos muito novos, regionais ou obscuros.
+```env
+MONGODB_URI=mongodb+srv://usuario:senha@cluster.mongodb.net/onde-assistir
+JWT_SECRET=um-segredo-forte-aqui
+TMDB_API_KEY=sua_chave_tmdb
+TMDB_REGION=BR
+TMDB_LANGUAGE=pt-BR
+```
+
+### TMDB — como obter a chave
 
 1. Crie uma conta em [themoviedb.org](https://www.themoviedb.org/signup)
-2. Em **Settings → API**, solicite uma API Key (plano gratuito)
-3. Cole em `TMDB_API_KEY` no `.env`
+2. Acesse **Settings → API** e solicite uma API Key (plano Developer, gratuito)
+3. Cole o valor em `TMDB_API_KEY` no `.env`
 
-Variáveis opcionais: `TMDB_REGION` (padrão `BR`), `TMDB_LANGUAGE` (padrão `pt-BR`).
+> O TMDB é a principal base de metadados do setor, mas **não é um catálogo oficial universal**. A disponibilidade de streaming vem da parceria TMDB + JustWatch e pode variar por região e data.
 
-4. *(Opcional)* Popule dados locais de exemplo no MongoDB:
+### Seed local (opcional)
 
 ```bash
 npm run seed
 ```
 
-O seed insere 30 títulos locais no MongoDB. **A busca do app usa o TMDB**, não essa coleção — o seed é só referência/legado.
+Insere 30 títulos de exemplo no MongoDB. **A busca do app usa o TMDB**, não essa coleção.
 
-## Rodando
+---
 
-- **Modo estático**
+## Como rodar
 
 ```bash
+# Produção
 npm start
-```
 
-- **Modo desenvolvimento (auto-reload)**
-
-```bash
+# Desenvolvimento (auto-reload)
 npm run dev
 ```
 
-Com o servidor no ar, o front-end estático fica disponível em `http://localhost:3000/` (pasta `frontend/` na raiz do repositório).
+Com o servidor no ar:
+
+- API: `http://localhost:3000/api/health`
+- Swagger: `http://localhost:3000/docs`
+- Front-end: `http://localhost:3000/login.html`
+
+---
 
 ## Front-end
 
-Front-end básico em HTML/CSS/JS puro na pasta `frontend/` (um nível acima deste diretório).
+Interface básica com fluxo de **cadastro → login → busca de títulos → logout**.
 
-### Opção A — recomendada (mesmo servidor)
+| Página | Descrição |
+|--------|-----------|
+| `login.html` | Entrada com e-mail e senha |
+| `register.html` | Cadastro de novo usuário |
+| `home.html` | Perfil + busca de filmes/séries |
+| `index.html` | Redireciona conforme sessão |
 
-1. Suba a API com `npm run dev` dentro de `onde-assistir/`
-2. Acesse `http://localhost:3000/login.html`
+### Opção A — mesmo servidor (recomendado)
 
-O Express serve os arquivos estáticos automaticamente.
+1. Garanta que a pasta `frontend/` existe em `../frontend` (relativo a este repo)
+2. Execute `npm run dev`
+3. Acesse `http://localhost:3000/login.html`
 
 ### Opção B — servidor estático separado
 
@@ -76,134 +185,204 @@ O Express serve os arquivos estáticos automaticamente.
 npx serve ../frontend -p 5500
 ```
 
-Nesse caso, altere `API_BASE` em `frontend/js/config.js` para `http://localhost:3000/api` (CORS já permite origens externas).
+Altere `API_BASE` em `frontend/js/config.js` para `http://localhost:3000/api`.
+
+---
+
+## API
+
+### Endpoints
+
+| Método | Rota | Auth | Descrição |
+|--------|------|------|-----------|
+| `GET` | `/api/health` | Não | Health check |
+| `POST` | `/api/auth/register` | Não | Cadastro |
+| `POST` | `/api/auth/login` | Não | Login |
+| `GET` | `/api/users/me` | Bearer | Perfil do usuário |
+| `GET` | `/api/titles/search` | Bearer | Busca filmes/séries |
+
+### Autenticação
+
+Envie o token JWT no header:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+Login e cadastro retornam:
+
+```json
+{
+  "user": { "id": "...", "name": "...", "email": "..." },
+  "accessToken": "...",
+  "expiresAt": "2026-06-29T12:00:00.000Z"
+}
+```
+
+### Busca de títulos
+
+```
+GET /api/titles/search?q=matrix&type=movie&limit=10
+```
+
+| Parâmetro | Obrigatório | Descrição |
+|-----------|-------------|-----------|
+| `q` | Sim | Termo de busca (mín. 2 caracteres) |
+| `type` | Não | `movie` ou `series` |
+| `limit` | Não | Máximo de resultados (padrão 20, máx. 20) |
+
+**Resposta de exemplo:**
+
+```json
+{
+  "query": "matrix",
+  "total": 1,
+  "region": "BR",
+  "source": "tmdb",
+  "results": [
+    {
+      "id": "movie-603",
+      "tmdbId": 603,
+      "title": "Matrix",
+      "type": "movie",
+      "year": 1999,
+      "synopsis": "...",
+      "posterUrl": "https://image.tmdb.org/t/p/w342/...",
+      "providers": [
+        { "name": "Netflix", "type": "subscription" }
+      ]
+    }
+  ]
+}
+```
+
+### Erros
+
+Respostas de erro seguem o formato:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Search query must have at least 2 characters"
+  }
+}
+```
+
+---
 
 ## Testes
 
 ```bash
+# Testes locais
 npm test
+
+# Simular execução da CI (cobertura + relatório JUnit)
+CI=true npm run test:ci          # Linux/macOS
+$env:CI='true'; npm run test:ci # Windows PowerShell
 ```
 
-Para simular a execução da pipeline localmente (com cobertura e relatório JUnit):
+Com `CI=true`, o relatório XML é gerado em `reports/junit.xml`.
 
-```bash
-# Linux/macOS
-CI=true npm run test:ci
+**Suítes cobertas:** autenticação (`authService`, `authController`), busca (`titleService`, `tmdbService`).
 
-# Windows PowerShell
-$env:CI='true'; npm run test:ci
-```
+---
 
-O relatório XML é gerado em `reports/junit.xml` quando `CI=true`.
+## Integração Contínua (CI)
 
-## Integração Contínua (GitHub Actions)
+Pipeline definida em [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-Este projeto utiliza **GitHub Actions** para automatizar a execução dos testes. A pipeline está definida em [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
-**Repositório:** https://github.com/JulianaBatista0807/onde-assistir
-
-### O que é Integração Contínua (CI)?
-
-**Integração Contínua** é a prática de integrar alterações de código com frequência e validar cada integração com testes automatizados. O objetivo é detectar erros cedo, manter o código sempre em estado deployável e dar feedback rápido ao desenvolvedor.
-
-Neste projeto, a CI executa a suíte **Jest** (testes unitários de autenticação, validação e busca TMDB) a cada alteração relevante no repositório.
-
-### Gatilhos (triggers) da pipeline
+### Gatilhos
 
 | Gatilho | Evento | Quando executa |
 |---------|--------|----------------|
-| **Push** | `push` | Ao enviar commits para `main`, `master` ou branches `feat/**` |
-| **Manual** | `workflow_dispatch` | Quando o usuário clica em **Run workflow** na aba Actions do GitHub |
-| **Agendado** | `schedule` | Toda segunda-feira às 06:00 UTC (`0 6 * * 1`) |
+| Push | `push` | Commits em `main`, `master` ou `feat/**` |
+| Manual | `workflow_dispatch` | Botão **Run workflow** na aba Actions |
+| Agendado | `schedule` | Segunda-feira às 06:00 UTC |
 
-### Fluxo da pipeline
+### Fluxo
 
 ```mermaid
 flowchart LR
-  trigger[Push / Manual / Schedule] --> checkout[Checkout do código]
-  checkout --> node[Setup Node.js 20]
+  trigger[Push / Manual / Schedule] --> checkout[Checkout]
+  checkout --> node[Node.js 20]
   node --> install[npm ci]
   install --> tests[npm run test:ci]
-  tests --> publish[Publicar relatório JUnit]
-  tests --> artifact[Upload de artefatos]
+  tests --> publish[Relatório JUnit]
+  tests --> artifact[Artefatos]
 ```
 
-1. **Checkout** — baixa o código do repositório.
-2. **Setup Node.js** — instala Node 20 com cache de dependências (`npm ci`).
-3. **Testes** — roda `npm run test:ci` (Jest com `--ci`, cobertura e relatório JUnit).
-4. **Publicação** — envia o resultado para **GitHub Checks** via `publish-unit-test-result-action`.
-5. **Artefatos** — armazena `reports/junit.xml` e pasta `coverage/` por 30 dias.
+1. Checkout do código
+2. Instalação com `npm ci`
+3. Execução de `npm run test:ci` (Jest + cobertura + JUnit)
+4. Publicação do resultado nos **GitHub Checks**
+5. Upload dos artefatos `test-report-*` e `coverage-report-*` (retenção: 30 dias)
 
-### Relatório de testes
+### Executar manualmente
 
-- **Formato:** JUnit XML gerado pelo pacote `jest-junit`.
-- **Local na pipeline:** artefato `test-report-<número da execução>` (baixável na aba Actions → run → Artifacts).
-- **Visualização no GitHub:** aba **Checks** de cada commit/PR mostra pass/fail por suite de teste.
+1. Acesse [Actions](https://github.com/JulianaBatista0807/onde-assistir/actions)
+2. Selecione o workflow **CI**
+3. Clique em **Run workflow**
 
-### Variáveis de ambiente na CI
+### Evidência de execução
 
-Os testes usam mocks e **não precisam** de MongoDB ou TMDB reais. A pipeline define valores fictícios:
-
-- `MONGODB_URI`, `JWT_SECRET`, `TMDB_API_KEY` — placeholders para carregar módulos sem `.env` local.
-
-### Como executar manualmente
-
-1. Acesse **Actions** no GitHub.
-2. Selecione o workflow **CI**.
-3. Clique em **Run workflow** → **Run workflow**.
-
-### Evidência de execução bem-sucedida
-
-Após o push desta configuração:
-
-1. Abra **Actions** → workflow **CI** → execução com status verde (✓).
-2. Capture screenshot ou copie a URL da run (ex.: `https://github.com/JulianaBatista0807/onde-assistir/actions/runs/<id>`).
-3. Opcional: baixe o artefato **test-report-*** com o `junit.xml`.
+Exemplo de run bem-sucedida:  
+https://github.com/JulianaBatista0807/onde-assistir/actions/runs/27922575713
 
 ### Conceitos aplicados
 
-- **Pipeline as Code** — workflow versionado em YAML no repositório.
-- **Fail fast** — pipeline falha se algum teste falhar.
-- **Artefatos** — relatórios persistidos além do log efêmero do job.
-- **Concurrency** — execuções concorrentes na mesma branch cancelam a anterior (`cancel-in-progress`).
-- **Ambiente reprodutível** — `npm ci` garante instalação idêntica ao `package-lock.json`.
+- **Integração Contínua (CI)** — validação automática a cada alteração
+- **Pipeline as Code** — workflow versionado em YAML
+- **Fail fast** — pipeline falha se algum teste falhar
+- **Artefatos** — relatórios persistidos além do log do job
+- **Ambiente reprodutível** — `npm ci` + variáveis fixas na pipeline
 
-## Endpoints
+Na CI, os testes usam mocks e **não dependem** de MongoDB ou TMDB reais.
 
-- `GET /api/health`
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/users/me` (Bearer token)
-- `GET /api/titles/search?q=matrix&type=movie` (Bearer token)
-
-### Busca de títulos (TMDB)
-
-- **Query params**: `q` (obrigatório, min. 2 caracteres), `type` (`movie` ou `series`, opcional), `limit` (opcional, máx. 20)
-- **200**: retorna `{ query, total, region, source: "tmdb", results }` com poster, sinopse e plataformas no Brasil
-- Requer `TMDB_API_KEY` configurada
-
-### Login
-
-- **200**: retorna `accessToken` e `expiresAt` (ISO 8601)
+---
 
 ## Swagger
 
-- UI: `/docs`
-- JSON: `/docs.json`
+Documentação interativa da API:
 
-## Estrutura de pastas
+- **UI:** http://localhost:3000/docs
+- **JSON:** http://localhost:3000/docs.json
 
-**Backend** (`onde-assistir/`):
+---
 
-- `src/routes`
-- `src/middleware`
-- `src/controllers`
-- `src/models` (User, Title)
-- `src/services`
-- `scripts/seedTitles.js`
+## Solução de problemas
 
-**Front-end** (`frontend/` na raiz do repositório):
+### `npm run dev` não sobe — erro de MongoDB
 
-- `login.html`, `register.html`, `home.html`
-- `css/`, `js/`
+```
+MongooseServerSelectionError: Could not connect to any servers...
+```
 
+**Causas comuns:**
+
+1. **IP não liberado no Atlas** — em Network Access, adicione seu IP atual ou `0.0.0.0/0` (apenas dev) e aguarde status **Active**
+2. **Connection string incorreta** — recopie em Atlas → Database → Connect → Drivers (`mongodb+srv://...`)
+3. **Credenciais erradas** — use usuário/senha de Database Access, não o login do site Atlas
+4. **Typo no nome do banco** — confira se a URI aponta para `onde-assistir`
+
+### Busca retorna erro 503 (`TMDB_NOT_CONFIGURED`)
+
+Configure `TMDB_API_KEY` no `.env` e reinicie o servidor.
+
+### Porta 3000 em uso (`EADDRINUSE`)
+
+```powershell
+netstat -ano | findstr :3000
+```
+
+Encerre o processo ou altere `PORT=3001` no `.env`.
+
+### Front-end não abre
+
+Confirme que a pasta `frontend/` existe em `../frontend` (relativo a este repositório) ou use a Opção B com servidor estático separado.
+
+---
+
+## Licença
+
+ISC
